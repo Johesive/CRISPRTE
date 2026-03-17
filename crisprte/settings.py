@@ -52,6 +52,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'api.middleware.APIAccessLogMiddleware',
 ]
 
 ROOT_URLCONF = 'crisprte.urls'
@@ -141,3 +142,34 @@ STATIC_URL = '/static/'
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'access': {
+            'format': '[{asctime}] {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+    },
+    'handlers': {
+        'api_access_file': {
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': '/var/log/crisprte/api_access.log',
+            'when': 'midnight',
+            'backupCount': 30,
+            'encoding': 'utf-8',
+            'formatter': 'access',
+        },
+    },
+    'loggers': {
+        'api_access': {
+            'handlers': ['api_access_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
