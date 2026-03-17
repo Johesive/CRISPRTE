@@ -16,7 +16,12 @@ from cache_utils.decorators import cached
 
 from .grna_scoring import calculate_azimuth
 
-te_info = {"hg38": {}, "mm10": {}}
+DB_MAP = {
+    'hg38': 'crisprtehg38',
+    'mm10': 'crisprtemm10',
+}
+
+te_info = {ga: {} for ga in DB_MAP}
 
 filemap = lambda x: os.path.join(settings.BASE_DIR, "api/" "refData", x)
 with open(filemap("te2int-hg38.pkl"), "rb") as f:
@@ -47,8 +52,10 @@ with open(filemap("mm10_combination_gids.json")) as f:
 
 class PGSQL:
     @staticmethod
-    def connect(dbname):
-        return psycopg2.connect(f"dbname={'crisprtehg38' if form['ga'] == 'hg38' else 'crisprtemm10'} user=postgres port=5432")
+    def get_connection(ga: str):
+        if ga not in DB_MAP:
+            raise ValueError(f"Unsupported genome assembly: {ga}")
+        return psycopg2.connect(f"dbname={DB_MAP[ga]} user=postgres port=5432")
 
     @staticmethod
     def select_gid_gseq(cursor, gseq: str) -> int:

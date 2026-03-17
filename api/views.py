@@ -11,7 +11,7 @@ from django.views.static import serve
 import os
 import json
 
-from .apiutils import PGSQL, te_info, combination_gids, parseGidAnno, parseGidAnno2, query_mismatch_annotation, calculate_offtarget_score
+from .apiutils import DB_MAP, PGSQL, te_info, combination_gids, parseGidAnno, parseGidAnno2, query_mismatch_annotation, calculate_offtarget_score
 from typing import Counter, Optional, Union, List
 import json 
 from .pako import Pako, Js
@@ -37,7 +37,7 @@ def v1(request):
             else:
                 te_class = te_info[ga]["te2int"][te_dup]
                 te_dup = 0
-            pconn = psycopg2.connect(f"dbname={'crisprtehg38' if form['ga'] == 'hg38' else 'crisprtemm10'} user=postgres port=5432")
+            pconn = PGSQL.get_connection(form['ga'])
             pcursor = pconn.cursor()
             result = PGSQL.select_gid_seqinfo_table1_tedup(pcursor, te_class, te_dup)
             result = list(map(lambda x:dict(zip(["Gid", "Location", "Moreno", "Azimuth", "Pam", "Upstream", "Downstream"], x)), result))
@@ -45,7 +45,7 @@ def v1(request):
             return JsonResponse(result)
         elif form['key'] == 'getGidAnno':
             gid = form['gid']
-            pconn = psycopg2.connect(f"dbname={'crisprtehg38' if form['ga'] == 'hg38' else 'crisprtemm10'} user=postgres port=5432")
+            pconn = PGSQL.get_connection(form['ga'])
             pcursor = pconn.cursor()
             if type(gid) == int:
                 result = PGSQL.select_gid_anno_table1_gid(pcursor, gid)
@@ -56,7 +56,7 @@ def v1(request):
             return JsonResponse(result)
         elif form['key'] == 'getGidInfo':
             gid = form['gid']
-            pconn = psycopg2.connect(f"dbname={'crisprtehg38' if form['ga'] == 'hg38' else 'crisprtemm10'} user=postgres port=5432")
+            pconn = PGSQL.get_connection(form['ga'])
             pcursor = pconn.cursor()
             result = PGSQL.select_allinfo_table1_gid(pcursor, gid)
             result = list(map(lambda x:dict(zip(["Location", "Gid", "Moreno", "Azimuth", "Pam", "Upstream", "Downstream", "AnnoClass", "AnnoInfo", "Dup"], parseGidAnno(ga, x))), result))
@@ -64,7 +64,7 @@ def v1(request):
             return JsonResponse(result)
         elif form['key'] == 'getGseqMismatch':
             gid = form['gid']
-            pconn = psycopg2.connect(f"dbname={'crisprtehg38' if form['ga'] == 'hg38' else 'crisprtemm10'} user=postgres port=5432")
+            pconn = PGSQL.get_connection(form['ga'])
             pcursor = pconn.cursor()
             result = PGSQL.select_table2_gid(pcursor, gid)
             result = dict(zip(["Gid", "Gseq", "Mismatch1", "Mismatch2", "Mismatch3"], result))
@@ -73,7 +73,7 @@ def v1(request):
         elif form['key'] == 'getGseq':
             gid = form['gid']
             with_mismatch = form['with_mismatch']
-            pconn = psycopg2.connect(f"dbname={'crisprtehg38' if form['ga'] == 'hg38' else 'crisprtemm10'} user=postgres port=5432")
+            pconn = PGSQL.get_connection(form['ga'])
             pcursor = pconn.cursor()
             if type(gid) == int:
                 if with_mismatch:
@@ -92,7 +92,7 @@ def v1(request):
                 pconn.close()
                 return JsonResponse(result)
         elif form['key'] == 'getMismatchBedGid':
-            pconn = PGSQL.connect(dbname = "crisprte{}".format(form['ga']))
+            pconn = PGSQL.get_connection(form['ga'])
             pcursor = pconn.cursor()
             result = []
             gid,gseq,mm1,mm2,mm3=PGSQL.select_table2_gid(pcursor, form['gid'])
@@ -158,13 +158,13 @@ def v2(request):
             else:
                 te_class = te_info[ga]["te2int"][te_dup]
                 te_dup = 0
-            pconn = psycopg2.connect(f"dbname={'crisprtehg38' if form['ga'] == 'hg38' else 'crisprtemm10'} user=postgres port=5432")
+            pconn = PGSQL.get_connection(form['ga'])
             pcursor = pconn.cursor()
             result = query_mismatch_annotation(pcursor, te_class = te_class, te_dup = te_dup, bydup = True, ga = ga)
             pconn.close()
             return HttpResponse(Js.btoa(Pako.deflate(json.dumps(result))), content_type='application/octet-stream')
         elif form['key'] == 'getGid':
-            pconn = psycopg2.connect(f"dbname={'crisprtehg38' if form['ga'] == 'hg38' else 'crisprtemm10'} user=postgres port=5432")
+            pconn = PGSQL.get_connection(form['ga'])
             pcursor = pconn.cursor()
             gid = PGSQL.select_gid_gseq(pcursor, gseq)
             pconn.close()
@@ -175,6 +175,12 @@ def v2(request):
 def v3(request):
     if request.method == 'POST':
         form = json.loads(request.body)
+        if form.get('ga') not in DB_MAP:
+            return HttpResponse(
+             json.dumps({'error': f"Unsupported genome assembly: {form.get('ga')}"}),
+                status=400,
+                content_type='application/json'
+            )
         print(form)
         for k,v in form.items():
             if type(v) == str and '_copy' in v:
@@ -191,7 +197,7 @@ def v3(request):
         elif form['key'] == 'getGRNACombinationByTeclass':
             ga = form['ga']
             te_class = form['te_class']
-            pconn = psycopg2.connect(f"dbname={'crisprtehg38' if form['ga'] == 'hg38' else 'crisprtemm10'} user=postgres port=5432")
+            pconn = PGSQL.get_connection(form['ga'])
             pcursor = pconn.cursor()
             if te_class not in combination_gids[ga].keys():
                 response = {
@@ -229,7 +235,7 @@ def v3(request):
                     return HttpResponse(Js.btoa(Pako.deflate(json.dumps(response))),content_type='application/octet-stream')
                 te_class = te_info[ga]["te2int"][te_class_]
                 te_dup = 0
-            pconn = psycopg2.connect(f"dbname={'crisprtehg38' if form['ga'] == 'hg38' else 'crisprtemm10'} user=postgres port=5432")
+            pconn = PGSQL.get_connection(form['ga'])
             pcursor = pconn.cursor()
             result = query_mismatch_annotation(pcursor, te_class = te_class, te_dup = te_dup, bydup = True, ga = ga)
             result = calculate_offtarget_score(result, te_class_, te_class_ + "_dup" + str(te_dup))
@@ -241,7 +247,7 @@ def v3(request):
             gseq = form.get('gseq', None)
             gseqs = form.get('gseqs', None)
             if gseq and not gseqs:
-                pconn = psycopg2.connect(f"dbname={'crisprtehg38' if form['ga'] == 'hg38' else 'crisprtemm10'} user=postgres port=5432")
+                pconn = PGSQL.get_connection(form['ga'])
                 pcursor = pconn.cursor()
                 gid = PGSQL.select_gid_gseq(pcursor, gseq)
                 if not gid:
@@ -291,7 +297,7 @@ def v3(request):
                 return HttpResponse(Js.btoa(Pako.deflate(json.dumps(result))),content_type='application/octet-stream')
             # Multiple gseqs
             elif gseqs and not gseq:
-                pconn = psycopg2.connect(f"dbname={'crisprtehg38' if form['ga'] == 'hg38' else 'crisprtemm10'} user=postgres port=5432")
+                pconn = PGSQL.get_connection(form['ga'])
                 pcursor = pconn.cursor()
                 for gseq in gseqs:
                     gid = PGSQL.select_gid_gseq(pcursor, gseq)
@@ -372,7 +378,7 @@ def v3(request):
             response = form['response']
             if "{}-{}.svg".format(gid, te_info[ga]["te2int"][te]) in os.listdir("/root/CRISPRTE/website-dev/static/img/svg/curves") and response == 2:
                 return "{}-{}.svg".format(gid, te_info[ga]["te2int"][te])
-            pconn = psycopg2.connect(f"dbname={'crisprtehg38' if form['ga'] == 'hg38' else 'crisprtemm10'} user=postgres port=5432")
+            pconn = PGSQL.get_connection(form['ga'])
             pcursor = pconn.cursor()
             target_consensus_length = PGSQL.select_te_ttf_by_te(pcursor, te_info[ga]["te2int"][te])['length']
             bed1 = PGSQL.select_bed_table1_gid(pcursor, gid)
@@ -403,7 +409,7 @@ def v3(request):
             else:
                 return None
         elif form['key'] == 'getGtfByTeName':
-            pconn = psycopg2.connect(f"dbname={'crisprtehg38' if form['ga'] == 'hg38' else 'crisprtemm10'} user=postgres port=5432")
+            pconn = PGSQL.get_connection(form['ga'])
             pcursor = pconn.cursor()
             result = PGSQL.select_gtf_by_tename(
                 pcursor,
@@ -418,7 +424,7 @@ def v3(request):
             end = int(end)
             start -= 10
             end += 10
-            pconn = psycopg2.connect(f"dbname={'crisprtehg38' if form['ga'] == 'hg38' else 'crisprtemm10'} user=postgres port=5432")
+            pconn = PGSQL.get_connection(form['ga'])
             pcursor = pconn.cursor()
             result = ''
             if types == "te":
@@ -452,14 +458,14 @@ def v3(request):
             return HttpResponse(Js.btoa(Pako.deflate(json.dumps(result))), content_type='application/octet-stream')
         elif form['key'] == 'getTtfByTE':
             te_class = form['te_class']
-            pconn = psycopg2.connect(f"dbname={'crisprtehg38' if form['ga'] == 'hg38' else 'crisprtemm10'} user=postgres port=5432")
+            pconn = PGSQL.get_connection(form['ga'])
             pcursor = pconn.cursor()
             result = PGSQL.select_te_ttf_by_te(pcursor, te_info[ga]["te2int"][te_class])
             return HttpResponse(Js.btoa(Pako.deflate(json.dumps(result))), content_type='application/octet-stream')
         elif form['key'] == 'getDtfByTE':
             te_class = form['te_class']
             te_copy = form['te_copy']
-            pconn = psycopg2.connect(f"dbname={'crisprtehg38' if form['ga'] == 'hg38' else 'crisprtemm10'} user=postgres port=5432")
+            pconn = PGSQL.get_connection(form['ga'])
             pcursor = pconn.cursor()
             result = PGSQL.select_te_dtf_by_te(pcursor, te_info[ga]["te2int"][te_class], te_copy)
             return HttpResponse(Js.btoa(Pako.deflate(json.dumps(result))), content_type='application/octet-stream')
