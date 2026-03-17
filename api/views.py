@@ -249,7 +249,7 @@ def v3(request):
                         "err": 0x1,
                         "message": "invalid TE class"
                     }
-                    return Response(Js.btoa(Pako.deflate(json.dumps(response))))
+                    return HttpResponse(Js.btoa(Pako.deflate(json.dumps(response))), content_type='application/octet-stream')
                 gid,gseq,mm1,mm2,mm3=PGSQL.select_table2_gid(pcursor, gid)
                 result['mm0'] = pd.DataFrame(
                     list(
