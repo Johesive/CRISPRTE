@@ -11,7 +11,7 @@ def parse_log(filepath):
     if not os.path.exists(filepath):
         return records
     pattern = re.compile(
-    r'\[(\d{4}-\d{2}-\d{2}) [\d:]+\].*key=([\w-]+) ga=([\w-]+) te_dup=([\w_-]+) status=(\d+) time=(\d+)ms'
+    r'\[(\d{4}-\d{2}-\d{2}) [\d:]+\].*key=([\w-]+) ga=([\w-]+) te_dup=([\w_-]+) source=([\w-]+) status=(\d+) time=(\d+)ms'
 )
     with open(filepath, 'r') as f:
         for line in f:
@@ -23,8 +23,9 @@ def parse_log(filepath):
                     'key':    m.group(2),
                     'ga':     m.group(3),
                     'te_dup':  m.group(4),
-                    'status': int(m.group(5)),
-                    'time':   int(m.group(6)),
+                    'source': m.group(5),
+                    'status': int(m.group(6)),
+                    'time':   int(m.group(7)),
                 })
     return records
 
@@ -35,24 +36,27 @@ def format_operations(records, total):
     f1 = sum(1 for r in records
              if r['key'] == 'getGRNAByTedup' and ('dup' in r['te_dup'] or 'copy' in r['te_dup']))
     percentage1 = round(f1 / total * 100) if total > 0 else 0
-    lines.append(f"    {'Targeting Single TE Copy':<45} {f1:>5} ({percentage1}%)")
+    lines.append(f"    {'Targeting Single TE Copy':<45} {f1:>5}")
+    # lines.append(f"    {'Targeting Single TE Copy':<45} {f1:>5} ({percentage1}%)")
 
     # TE Subfamily: getGRNAByTedup without 'dup', or getGRNACombinationByTeclass
     f2 = sum(1 for r in records
              if (r['key'] == 'getGRNAByTedup' and 'dup' not in r['te_dup'] and 'copy' not in r['te_dup'])
              or r['key'] == 'getGRNACombinationByTeclass')
     percentage2 = round(f2 / total * 100) if total > 0 else 0
-    lines.append(f"    {'Targeting TE Subfamily':<45} {f2:>5} ({percentage2}%)")
+    lines.append(f"    {'Targeting TE Subfamily':<45} {f2:>5}")
+    # lines.append(f"    {'Targeting TE Subfamily':<45} {f2:>5} ({percentage2}%)")
 
     # Targeting TEs within Genomic Coordinate: getGtfByRegion
-    f3 = sum(1 for r in records if r['key'] == 'getGtfByRegion')
+    f3 = sum(1 for r in records if (r['key'] == 'getGtfByRegion' and r.get('source') == 'design'))
     percentage3 = round(f3 / total * 100) if total > 0 else 0
-    lines.append(f"    {'Targeting TEs within Genomic Coordinate':<45} {f3:>5} ({percentage3}%)")
+    lines.append(f"    {'Targeting TEs within Genomic Coordinate':<45} {f3:>5}")
+    # lines.append(f"    {'Targeting TEs within Genomic Coordinate':<45} {f3:>5} ({percentage3}%)")
 
     # others
-    others = total - f1 - f2 - f3
-    others_percentage = round(others / total * 100) if total > 0 else 0
-    lines.append(f"    {'others':<45} {others:>5} ({others_percentage}%)")
+    # others = total - f1 - f2 - f3
+    # others_percentage = round(others / total * 100) if total > 0 else 0
+    # lines.append(f"    {'others':<45} {others:>5} ({others_percentage}%)")
 
     return "\n".join(lines)
 
@@ -76,7 +80,7 @@ def make_stats(records):
         ok    = sum(1 for r in m_record if r['status'] == 200)
         err   = total - ok
         avg_t = round(sum(r['time'] for r in m_record) / total)
-        ga_count = Counter(r['ga'] for r in m_record)
+        ga_count = Counter(r['ga'] for r in m_record if r['ga'] != '-')
 
         lines.append(f"\n[{month}]")
         lines.append(f"  Total requests : {total}")
@@ -98,7 +102,7 @@ def make_stats(records):
         ok    = sum(1 for r in records if r['status'] == 200)
         err   = total - ok
         avg_t = round(sum(r['time'] for r in records) / total)
-        ga_count = Counter(r['ga'] for r in records)
+        ga_count = Counter(r['ga'] for r in m_record if r['ga'] != '-')
         dates = sorted(set(r['date'] for r in records))
 
         lines.append(f"  Date range     : {dates[0]} ~ {dates[-1]}")

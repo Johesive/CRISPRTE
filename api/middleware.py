@@ -16,11 +16,13 @@ class APIAccessLogMiddleware:
         operation_key = '-'  # operation name
         ga = '-'  # species
         te_dup = '-' # TE subfamily/copy name
+        source = '-'
         try:
             body = json.loads(request.body)
             operation_key = body.get('key', '-')
             ga = body.get('ga', '-')
             te_dup = body.get('te_dup', '-')
+            source = body.get('source', '-')
         except Exception:
             pass
 
@@ -31,7 +33,7 @@ class APIAccessLogMiddleware:
         elapsed = round((time.time() - start_time) * 1000)
         logger.info(
             f'{ip} "{request.method} {request.path}" '
-            f'key={operation_key} ga={ga} te_dup={te_dup} '
+            f'key={operation_key} ga={ga} te_dup={te_dup} source={source} '
             f'status={response.status_code} time={elapsed}ms'
         )
         return response
