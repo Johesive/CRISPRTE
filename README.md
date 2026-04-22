@@ -4,9 +4,10 @@ A log parsing and analytics module for [CRISPR-TE](https://www.crisprte.cn),
 classifying user design requests into three operation modes and generating 
 monthly/cumulative usage statistics.
 
-> **Related Publication:** Guo *et al.*, CRISPR-TE: a web-based tool to guide 
-> the manipulation of transposable elements. *Mobile DNA* (2024). 
-> [DOI](https://link.springer.com/article/10.1186/s13100-024-00313-0)
+> **Related Publication:** 
+> Guo, Y., Xue, Z., Gong, M., Jin, S., Wu, X., & Liu, W. (2024).
+> CRISPR-TE: a web-based tool to generate single guide RNAs targeting 
+> transposable elements. Mobile DNA, 15(1), 3. [DOI](https://doi.org/10.1186/s13100-024-00313-0)
 
 ---
 
